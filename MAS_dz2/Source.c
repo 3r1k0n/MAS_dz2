@@ -1,128 +1,87 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-#define PI 3.141592653
-#define VELICINA_BLOKA 8
+#define BLOCK_SIZE 16
 
 float F(int u, int v, short *matrix, int width, int iBlokova, int jBlokova);
 void ispisBlokaFloat(float *matrix);
 void ispisBlokaUChar(unsigned char *matrix);
 void ispisBlokaShort(short *matrix, int rb, int sirinaUBlokovima, int width, FILE *out);
+
 void ispisStatistike(char filePath[], int bucketNumber);
+char* loadPicture(char pictureAddress[], int* height, int* width);
+char* loadBlock(int y, int x, char* picture, int pictureWidth, int blockSize);
+float MAD(char* block1, char* block2, int blockSize);\
 
 int main(int argc, char *argv[])
 {
-	/*unsigned char buff[255], buffPixel[3], buffPixel2[4], newLineChar, testc;
-	unsigned char r, g, b;
-	short K1[8][8] = {
-		16 , 11 , 10 , 16 , 24 , 40 , 51 , 61,
-		12 , 12 , 14 , 19 , 26 , 58 , 60 , 55,
-		14 , 13 , 16 , 24 , 40 , 57 , 69 , 56,
-		14 , 17 , 22 , 29 , 51 , 87 , 80 ,  62,1
-		18 , 22 , 37 , 56 , 68 ,  109  ,103,  77,
-		24 , 35 , 55 , 64 , 81  , 104  ,113 , 92,
-		49 , 64 , 78 , 87 , 103  ,121 , 120 , 101,
-		72 , 92 , 95 , 98 , 112  ,100 , 103  ,99 };
-	short K2[8][8] = {
-		17,	18	,24,	47	,99	,99,	99,	99,
-		18	,21	,26	,66	,99,	99	,99,	99,
-		24	,26	,56	,99	,99	,99	,99	,99,
-		47	,66	,99	,99	,99	,99	,99	,99,
-		99	,99	,99	,99	,99	,99	,99	,99,
-		99	,99	,99	,99	,99	,99	,99	,99,
-		99	,99	,99	,99	,99	,99,99,	99,
-		99	,99,99,	99,	99	,99,99	,99
-	};
+	unsigned char buff[255],*picture;
+	int height, width;
+	int sampleBlockN = 33;
+
+	unsigned char *picture1 = loadPicture("lenna.pgm", &height, &width);
+	unsigned char *picture2 = loadPicture("lenna1.pgm", &height, &width);
+
+	unsigned char *startBlock = loadBlock((sampleBlockN / (width / BLOCK_SIZE))*BLOCK_SIZE, (sampleBlockN % (width / BLOCK_SIZE))*BLOCK_SIZE, picture1, width, BLOCK_SIZE);
+
+	ispisStatistike("lenna.pgm", BLOCK_SIZE);
+	return 33;
+}
+char* loadPicture(char pictureAddress[], int* height, int* width) {
+	unsigned char buff[255];
 
 	FILE *fp;
-	fp = fopen(argv[1], "rb");
+	fp = fopen(pictureAddress, "rb");
 
 	fscanf(fp, "%s", buff);
 
-	if (strcmp(buff, "P6") != 0) {
-		printf("Ovaj program je namijenjen samo P6 formatu ppm slika.\n");
+	if (strcmp(buff, "P5") != 0) {
+		printf("Ovaj program je namijenjen samo P5 formatu ppm slika.\n");
 		return 0;
 	}
 
 	fscanf(fp, "%s", buff);
-	int width = atoi(buff);
+	*width = atoi(buff);
 
 	fscanf(fp, "%s", buff);
-	const int height = atoi(buff);
+	*height = atoi(buff);
 
 	fscanf(fp, "%s", buff);
 	const int max = atoi(buff);
 
-	newLineChar = fgetc(fp);
+	// reads a new line
+	fgetc(fp); 
 
-	unsigned char *R = (char *)malloc(height*width*sizeof(char));
-	unsigned char *G = (char *)malloc(height*width*sizeof(char));
-	unsigned char *B = (char *)malloc(height*width*sizeof(char));
+	unsigned char *picture = (char *)malloc((*height)*(*width)*sizeof(char));
 
-	float *Y = (float *)malloc(height*width*sizeof(float));
-	float *Cb = (float *)malloc(height*width*sizeof(float));
-	float *Cr = (float *)malloc(height*width*sizeof(float));
-
-	for (int redak = 0; redak < height; redak++) {
-		for (int stupac = 0; stupac < width; stupac++) {
-			r = fgetc(fp);
-			g = fgetc(fp);
-			b = fgetc(fp);
-
-			*(R + redak*width + stupac) = r;
-			*(G + redak*width + stupac) = g;
-			*(B + redak*width + stupac) = b;
-
-			*(Y + redak*width + stupac) = 0.299*r + 0.587*g + 0.114*b - 128; //translacija dodana
-			*(Cb + redak*width + stupac) = -0.1687*r - 0.3313*g + 0.5*b + 128 - 128;
-			*(Cr + redak*width + stupac) = 0.5*r - 0.4187*g - 0.0813*b + 128 - 128;
+	for (int redak = 0; redak < (*height); redak++) {
+		for (int stupac = 0; stupac < (*width); stupac++) {
+			*(picture + redak*(*width) + stupac) = fgetc(fp);
 		}
 	}
-	fclose(fp);
 
-	///////RACUNANJE 2D-DCT
+	return picture;
+}
+char* loadBlock(int y, int x, char* picture,int pictureWidth, int blockSize) {
+	unsigned char *block = (char *)malloc(blockSize*blockSize*sizeof(char));
 
-	int sirinaUBlokovima = width / VELICINA_BLOKA;
-	int visinaUBlokovima = height / VELICINA_BLOKA;
-
-	float *FY = (float *)malloc(width*height*sizeof(float));
-	float *FCb = (float *)malloc(width*height*sizeof(float));
-	float *FCr = (float *)malloc(width*height*sizeof(float));
-
-	short *FY_kvantizirano = (short *)malloc(width*height*sizeof(short));
-	short *FCb_kvantizirano = (short *)malloc(width*height*sizeof(short));
-	short *FCr_kvantizirano = (short *)malloc(width*height*sizeof(short));
-
-	float mfy, mfcb, mfcr;
-
-	for (int iB = 0; iB < visinaUBlokovima; iB++) {
-		for (int jB = 0; jB < sirinaUBlokovima; jB++) { //iB i jB su koordinate s obzirom na blokova 64x64
-			for (int u = 0; u < VELICINA_BLOKA; u++) {
-				for (int v = 0; v < VELICINA_BLOKA; v++) { //u i v su koordinate unutar jednog bloka u frekvencijskoj domeni
-					mfy = F(u, v, Y, width, iB, jB);
-					mfcb = F(u, v, Cb, width, iB, jB);
-					mfcr = F(u, v, Cr, width, iB, jB);
-
-					*(FY + (VELICINA_BLOKA*iB + u)*width + VELICINA_BLOKA*jB + v) = mfy;
-					*(FCb + (VELICINA_BLOKA * iB + u)*width + VELICINA_BLOKA * jB + v) = mfcb;
-					*(FCr + (VELICINA_BLOKA * iB + u)*width + VELICINA_BLOKA * jB + v) = mfcr;
-
-					*(FY_kvantizirano + (VELICINA_BLOKA * iB + u)*width + VELICINA_BLOKA * jB + v) = round(mfy / K1[u][v]);
-					*(FCb_kvantizirano + (VELICINA_BLOKA * iB + u)*width + VELICINA_BLOKA * jB + v) = round(mfcb / K2[u][v]);
-					*(FCr_kvantizirano + (VELICINA_BLOKA * iB + u)*width + VELICINA_BLOKA * jB + v) = round(mfcr / K2[u][v]);
-				}
-			}
+	for (int redak = 0; redak < blockSize; redak++) {
+		for (int stupac = 0; stupac < blockSize; stupac++) {
+			*(block + redak*blockSize + stupac)=*(picture + (y+redak)*pictureWidth + (x+stupac));
 		}
 	}
-	FILE *fop = fopen(argv[3], "w");
-	ispisBlokaShort(FY_kvantizirano, atoi(argv[2]), sirinaUBlokovima, width, fop);
-	ispisBlokaShort(FCb_kvantizirano, atoi(argv[2]), sirinaUBlokovima, width, fop);
-	ispisBlokaShort(FCr_kvantizirano, atoi(argv[2]), sirinaUBlokovima, width, fop);
-	fclose(fop);
-	*/
 
-	ispisStatistike("lenna.pgm", 16);
-	return 0;
+	return block;
+}
+float MAD(char* block1, char* block2,int blockSize) {
+	int sum = 0;
+	int N2 = blockSize*blockSize;
+	for (int i = 0; i < blockSize; i++) {
+		for (int j = 0; j < blockSize; j++) {
+			sum += abs( *(block1+i*blockSize+j) - *(block2 + i*blockSize + j) );
+		}
+	}
+	return (float)sum / (float)N2;
 }
 void ispisStatistike(char filePath[], int bucketNumber) {
 	unsigned char buff[255], newLineChar, c;
@@ -167,54 +126,4 @@ void ispisStatistike(char filePath[], int bucketNumber) {
 		printf("%d. %f\n", i, (float)buckets[i] / (float)totalElements);
 	}
 	fclose(fp);
-}
-
-float F(int u, int v, float *matrix, int width, int iB, int jB) {
-	float Cu = 1, Cv = 1;
-	if (u == 0) Cu = pow(0.5, 0.5);
-	if (v == 0) Cv = pow(0.5, 0.5);
-
-	float sum = 0.0;
-	for (int i = 0; i < VELICINA_BLOKA; i++) {
-		for (int j = 0; j < VELICINA_BLOKA; j++) {
-			float elementIJ = *(matrix + (VELICINA_BLOKA * iB + i)*width + (VELICINA_BLOKA * jB + j));
-			sum += elementIJ*cos((2 * i + 1)*u*PI / 16)*cos((2 * j + 1)*v*PI / 16);
-		}
-	}
-	return 0.25*Cu*Cv*sum;
-}
-
-void ispisBlokaShort(short *matrix, int rb, int sirinaUBlokovima, int width, FILE *out) {
-
-	int PBi = floor(rb / sirinaUBlokovima);
-	int PBj = (rb%sirinaUBlokovima)*VELICINA_BLOKA;
-
-	for (int i = 0; i < VELICINA_BLOKA; i++) {
-		for (int j = 0; j < VELICINA_BLOKA; j++) {
-			fprintf(out, "%hi ", *(matrix + (PBi + i)*width + PBj + j));
-		}
-		fprintf(out, "\n");
-	}
-	fprintf(out, "\n");
-}
-void ispisBlokaUChar(unsigned char *matrix) {
-	printf("--------------------\n");
-	for (int i = 0; i < VELICINA_BLOKA; i++) {
-		for (int j = 0; j < VELICINA_BLOKA; j++) {
-			printf("%hhu ", *(matrix + i * 512 + j));
-		}
-		printf("\n");
-	}
-	printf("--------------------\n");
-}
-
-void ispisBlokaFloat(float *matrix) {
-	printf("--------------------\n");
-	for (int i = 0; i < VELICINA_BLOKA; i++) {
-		for (int j = 0; j < VELICINA_BLOKA; j++) {
-			printf("%6.2f ", *(matrix + i * 512 + j));
-		}
-		printf("\n");
-	}
-	printf("--------------------\n");
 }
