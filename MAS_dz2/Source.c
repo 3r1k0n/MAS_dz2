@@ -2,6 +2,8 @@
 #include <math.h>
 #include <string.h>
 #define BLOCK_SIZE 16
+#define SEARCH_WINDOW 16
+
 
 float F(int u, int v, short *matrix, int width, int iBlokova, int jBlokova);
 void ispisBlokaFloat(float *matrix);
@@ -11,22 +13,56 @@ void ispisBlokaShort(short *matrix, int rb, int sirinaUBlokovima, int width, FIL
 void ispisStatistike(char filePath[], int bucketNumber);
 char* loadPicture(char pictureAddress[], int* height, int* width);
 char* loadBlock(int y, int x, char* picture, int pictureWidth, int blockSize);
-float MAD(char* block1, char* block2, int blockSize);\
+float MAD(char* block1, char* block2, int blockSize);
+void calculateMovement(int* outX, int* outY, int blockNumber,int blockSize,int width, int height);
 
 int main(int argc, char *argv[])
 {
 	unsigned char buff[255],*picture;
-	int height, width;
-	int sampleBlockN = 33;
+	int height, width,resultX,resultY;
+	int sampleBlockN = 0;
 
 	unsigned char *picture1 = loadPicture("lenna.pgm", &height, &width);
 	unsigned char *picture2 = loadPicture("lenna1.pgm", &height, &width);
 
-	unsigned char *startBlock = loadBlock((sampleBlockN / (width / BLOCK_SIZE))*BLOCK_SIZE, (sampleBlockN % (width / BLOCK_SIZE))*BLOCK_SIZE, picture1, width, BLOCK_SIZE);
+	
 
+	calculateMovement(&resultX,&resultY,sampleBlockN,BLOCK_SIZE,width,height,picture1,picture2);
+	printf("----------\n(%d, %d)",resultX,resultY);
 	ispisStatistike("lenna.pgm", BLOCK_SIZE);
-	return 33;
+	return 0;
 }
+void calculateMovement(int* outX, int* outY, int blockNumber, int blockSize, int width, int height,char* picture1,char* picture2) {
+
+	float minMAD = 999999;
+	int maxI, maxJ;
+	float mad;
+	
+	int startRow = (blockNumber / (width / BLOCK_SIZE))*BLOCK_SIZE;
+	int startColumn = (blockNumber % (width / BLOCK_SIZE))*BLOCK_SIZE;
+
+	unsigned char *startBlock = loadBlock(startRow, startColumn, picture1, width, BLOCK_SIZE);
+
+	for (int i = -SEARCH_WINDOW; i <= SEARCH_WINDOW; i++) {
+		if ((startRow + i) >= 0 && (startRow + i + BLOCK_SIZE) < height) {
+			for (int j = -SEARCH_WINDOW; j <= SEARCH_WINDOW; j++) {
+				
+				if ((startColumn + j) >= 0 && (startColumn + j + BLOCK_SIZE) < width) {
+					unsigned char *secondBlock = loadBlock(startRow+i, startColumn+j, picture2, width, BLOCK_SIZE);
+					mad = MAD(startBlock, secondBlock, BLOCK_SIZE);
+					printf("(%d,%d)=%f\n", j,i, mad);
+					if (mad <= minMAD) {
+						minMAD = mad;
+						*outY = i;
+						*outX = j;
+					}
+				}
+			}
+		}
+	}
+	
+}
+
 char* loadPicture(char pictureAddress[], int* height, int* width) {
 	unsigned char buff[255];
 
@@ -78,7 +114,11 @@ float MAD(char* block1, char* block2,int blockSize) {
 	int N2 = blockSize*blockSize;
 	for (int i = 0; i < blockSize; i++) {
 		for (int j = 0; j < blockSize; j++) {
-			sum += abs( *(block1+i*blockSize+j) - *(block2 + i*blockSize + j) );
+
+			unsigned char a = *(block1 + i*blockSize + j);
+			unsigned char b = *(block2 + i*blockSize + j);
+
+			sum += abs( a - b );
 		}
 	}
 	return (float)sum / (float)N2;
