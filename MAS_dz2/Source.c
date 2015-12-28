@@ -1,14 +1,7 @@
 #include <stdio.h>
-#include <math.h>
 #include <string.h>
 #define BLOCK_SIZE 16
 #define SEARCH_WINDOW 16
-
-
-float F(int u, int v, short *matrix, int width, int iBlokova, int jBlokova);
-void ispisBlokaFloat(float *matrix);
-void ispisBlokaUChar(unsigned char *matrix);
-void ispisBlokaShort(short *matrix, int rb, int sirinaUBlokovima, int width, FILE *out);
 
 void ispisStatistike(char filePath[], int bucketNumber);
 char* loadPicture(char pictureAddress[], int* height, int* width);
@@ -18,20 +11,26 @@ void calculateMovement(int* outX, int* outY, int blockNumber,int blockSize,int w
 
 int main(int argc, char *argv[])
 {
-	unsigned char buff[255],*picture;
+	unsigned char *picture;
 	int height, width,resultX,resultY;
-	int sampleBlockN = 0;
+	int inputNumber = atoi(argv[1]);
 
-	unsigned char *picture1 = loadPicture("lenna.pgm", &height, &width);
-	unsigned char *picture2 = loadPicture("lenna1.pgm", &height, &width);
+	unsigned char *picture1 = loadPicture("lenna1.pgm", &height, &width);
+	unsigned char *picture2 = loadPicture("lenna.pgm", &height, &width);
 
+	if (inputNumber<0 || inputNumber>=1024) {
+		printf("Block number must be between 0 and 1023.\n");
+		return 0;
+	}
+
+	calculateMovement(&resultX,&resultY,inputNumber,BLOCK_SIZE,width,height,picture1,picture2);
+	printf("(%d, %d)",resultX,resultY);
+
+	/*ispisStatistike("lenna.pgm", BLOCK_SIZE);*/
 	
-
-	calculateMovement(&resultX,&resultY,sampleBlockN,BLOCK_SIZE,width,height,picture1,picture2);
-	printf("----------\n(%d, %d)",resultX,resultY);
-	ispisStatistike("lenna.pgm", BLOCK_SIZE);
 	return 0;
 }
+
 void calculateMovement(int* outX, int* outY, int blockNumber, int blockSize, int width, int height,char* picture1,char* picture2) {
 
 	float minMAD = 999999;
@@ -50,7 +49,7 @@ void calculateMovement(int* outX, int* outY, int blockNumber, int blockSize, int
 				if ((startColumn + j) >= 0 && (startColumn + j + BLOCK_SIZE) < width) {
 					unsigned char *secondBlock = loadBlock(startRow+i, startColumn+j, picture2, width, BLOCK_SIZE);
 					mad = MAD(startBlock, secondBlock, BLOCK_SIZE);
-					printf("(%d,%d)=%f\n", j,i, mad);
+
 					if (mad <= minMAD) {
 						minMAD = mad;
 						*outY = i;
@@ -106,7 +105,6 @@ char* loadBlock(int y, int x, char* picture,int pictureWidth, int blockSize) {
 			*(block + redak*blockSize + stupac)=*(picture + (y+redak)*pictureWidth + (x+stupac));
 		}
 	}
-
 	return block;
 }
 float MAD(char* block1, char* block2,int blockSize) {
